@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Geometry Dash Spikes Only</title>
+<style>
+body{margin:0;overflow:hidden;font-family:Arial;}
+canvas{display:block;}
+#ui{position:absolute;top:15px;left:50%;transform:translateX(-50%);width:70%;}
+#barBg{width:100%;height:18px;background:#333;border-radius:10px;}
+#bar{width:0%;height:100%;background:lime;border-radius:10px;}
+#percent{text-align:center;color:white;margin-top:5px;}
+#restart{
+position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+padding:15px 30px;font-size:20px;display:none;cursor:pointer;
+}
+#highscore{
+position:absolute;top:50px;left:50%;transform:translateX(-50%);
+color:white;font-size:18px;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+<div id="barBg"><div id="bar"></div></div>
+<div id="percent">0%</div>
+</div>
+<div id="highscore">Highscore: 0</div>
+<button id="restart">Respawn</button>
+<canvas id="game"></canvas>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=500;
+
+let gravity=0.8;
+let speed=6;
+let distance=0;
+let maxDistance=30000;
+let gameOver=false;
+let particles=[];
+
+let highscore=localStorage.getItem("gd_highscore")||0;
+document.getElementById("highscore").innerText="Highscore: "+highscore;
+
+let player={x:150,y:400,size:30,dy:0,jumping:false,rotation:0};
+let obstacles=[];
+
+// Funktion: Dreiecke-Spikes
+function spawnSpike(){
+let minHeight=20;
+let maxHeight=70;
+let height=Math.random()*(maxHeight-minHeight)+minHeight;
+obstacles.push({x:canvas.width,y:430,w:30,h:height,type:"spike"});
+}
+
+// Schwierigkeit steigt langsam
+function spawnObstacle(){
+let chance=Math.min(0.7,distance/10000 + 0.3);
+if(Math.random()<chance) spawnSpike();
+}
+setInterval(spawnObstacle,1000);
+
+function jump(){
+if(!player.jumping && !gameOver){player.dy=-15;player.jumping=true;}
+}
+
+document.addEventListener("keydown",e=>{if(e.code==="Space")jump();});
+document.addEventListener("click",jump);
+
+function explode(){
+for(let i=0;i<25;i++){
+particles.push({x:player.x+15,y:player.y+15,dx:(Math.random()-0.5)*8,dy:(Math.random()-0.5)*8,life:30});
+}
+}
+
+function update(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+let progress=distance/maxDistance;
+canvas.style.background=`hsl(${progress*360},70%,40%)`;
+if(!gameOver) distance+=speed;
+
+let percent=Math.min(100,Math.floor((distance/maxDistance)*100));
+document.getElementById("bar").style.width=percent+"%";
+document.getElementById("percent").innerText=percent+"%";
+
+if(percent>=100 && !gameOver){
+alert("LEVEL COMPLETE 🔥");
+gameOver=true;
+document.getElementById("restart").style.display="block";
+if(distance>highscore){highscore=Math.floor(distance);localStorage.setItem("gd_highscore",highscore);}
+document.getElementById("highscore").innerText="Highscore: "+highscore;
+}
+
+// Boden
+ctx.fillStyle="#222";
+ctx.fillRect(0,460,canvas.width,40);
+
+// Player
+player.dy+=gravity;
+player.y+=player.dy;
+if(player.y>430){player.y=430;player.jumping=false;player.rotation=0;}
+ctx.save();
+ctx.translate(player.x+15,player.y+15);
+ctx.rotate(player.rotation*Math.PI/180);
+ctx.fillStyle="cyan";
+ctx.fillRect(-15,-15,30,30);
+ctx.restore();
+if(player.jumping) player.rotation+=10;
+
+// Hindernisse
+obstacles.forEach((o,i)=>{
+o.x-=speed;
+if(o.type==="spike"){
+ctx.fillStyle="red";
+ctx.beginPath();
+ctx.moveTo(o.x,460);
+ctx.lineTo(o.x+o.w/2,460-o.h);
+ctx.lineTo(o.x+o.w,460);
+ctx.fill();
+}
+// Kollision
+if(player.x<o.x+o.w && player.x+30>o.x && player.y<o.y+o.h && player.y+30>o.y){
+gameOver=true;explode();document.getElementById("restart").style.display="block";
+if(distance>highscore){highscore=Math.floor(distance);localStorage.setItem("gd_highscore",highscore);}
+document.getElementById("highscore").innerText="Highscore: "+highscore;
+}
+if(o.x+o.w<0) obstacles.splice(i,1);
+});
+
+// Partikel
+particles.forEach((p,i)=>{p.x+=p.dx;p.y+=p.dy;p.life--;ctx.fillStyle="orange";ctx.fillRect(p.x,p.y,4,4);
+if(p.life<=0) particles.splice(i,1);
+});
+
+requestAnimationFrame(update);
+}
+update();
+
+// Respawn Button
+document.getElementById("restart").addEventListener("click",()=>{
+obstacles=[];distance=0;gameOver=false;player.y=400;player.dy=0;particles=[];
+document.getElementById("restart").style.display="none";
+});
+</script>
+</body>
+</html>
